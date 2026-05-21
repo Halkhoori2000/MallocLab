@@ -1,8 +1,6 @@
 # MallocLab — Custom Dynamic Memory Allocator
 
 **[Live Showcase →](https://halkhoori2000.github.io/MallocLab/)**
-&nbsp;·&nbsp;
-**[GitHub →](https://github.com/Halkhoori2000/MallocLab)**
 
 A from-scratch implementation of `malloc`, `free`, `realloc`, and `calloc` in C, achieving **20,092 Kops/s** throughput with only **8 bytes of overhead** per allocation.
 
