@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MallocLab — Custom Dynamic Memory Allocator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { background: #161b22; border-bottom: 1px solid #30363d; padding: 24px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header .subtitle { font-size: 0.85rem; color: #8b949e; margin-top: 2px; }
+    .header-links { display: flex; gap: 12px; }
+    .btn { display: inline-block; padding: 8px 18px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; border: none; text-decoration: none; }
+    .btn:hover { opacity: 0.85; text-decoration: none; }
+    .btn-secondary { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
+    main { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+    .hero { text-align: center; margin-bottom: 56px; }
+    .hero h2 { font-size: 2.2rem; font-weight: 700; margin-bottom: 12px; }
+    .hero p { font-size: 1.05rem; color: #8b949e; max-width: 640px; margin: 0 auto 28px; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
+    .badge { background: #161b22; border: 1px solid #30363d; border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; color: #8b949e; }
+    .stat-highlight { display: inline-block; background: #0d419d; border: 1px solid #1f6feb; border-radius: 20px; padding: 4px 14px; font-size: 0.82rem; color: #79c0ff; font-weight: 600; }
+    section { margin-bottom: 56px; }
+    section h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .feature-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
+    .feature-card .icon { font-size: 1.5rem; margin-bottom: 10px; }
+    .feature-card h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; }
+    .feature-card p { font-size: 0.85rem; color: #8b949e; }
+    .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem; overflow-x: auto; }
+    .code-block .comment { color: #484f58; }
+    .code-block .keyword { color: #ff7b72; }
+    .code-block .type { color: #79c0ff; }
+    .code-block .number { color: #79c0ff; }
+    .code-block .macro { color: #d2a8ff; }
+    .perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .perf-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; text-align: center; }
+    .perf-card .val { font-size: 1.8rem; font-weight: 700; color: #3fb950; }
+    .perf-card .unit { font-size: 0.78rem; color: #484f58; margin-top: 2px; }
+    .perf-card .lbl { font-size: 0.82rem; color: #8b949e; margin-top: 6px; }
+    .block-diagram { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .block-type { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+    .block-type h5 { background: #21262d; padding: 8px 14px; font-size: 0.82rem; font-weight: 600; color: #8b949e; border-bottom: 1px solid #30363d; }
+    .block-row { padding: 8px 14px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; border-bottom: 1px solid #21262d; display: flex; justify-content: space-between; }
+    .block-row:last-child { border-bottom: none; }
+    .block-row .field { color: #e6edf3; }
+    .block-row .size { color: #484f58; }
+    .block-row.header { background: rgba(31,111,235,0.15); }
+    .block-row.payload { background: rgba(63,185,80,0.08); }
+    .block-row.footer { background: rgba(255,123,114,0.1); }
+    .block-row.link { background: rgba(210,168,255,0.1); }
+    footer { text-align: center; padding: 32px; border-top: 1px solid #21262d; color: #484f58; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>MallocLab</h1>
+    <div class="subtitle">Custom Dynamic Memory Allocator — C · Segregated Free Lists</div>
+  </div>
+  <div class="header-links">
+    <a class="btn btn-secondary" href="https://github.com/Halkhoori2000/MallocLab" target="_blank">GitHub</a>
+  </div>
+</header>
+
+<main>
+
+  <div class="hero">
+    <h2>malloc · free · realloc · calloc</h2>
+    <p>A from-scratch dynamic memory allocator in C using segregated free lists, a previous-allocated bit flag, and a 16-byte small-block optimisation — 8 bytes overhead per allocation.</p>
+    <div class="badge-row">
+      <span class="badge">C</span>
+      <span class="badge">Segregated Free Lists</span>
+      <span class="badge">Best-Fit</span>
+      <span class="badge">Boundary Tags</span>
+      <span class="badge">Coalescing</span>
+      <span class="badge">16-byte Alignment</span>
+      <span class="stat-highlight">20,092 Kops/s</span>
+    </div>
+  </div>
+
+  <section>
+    <h3>Performance</h3>
+    <div class="perf-grid">
+      <div class="perf-card">
+        <div class="val">20,092</div>
+        <div class="unit">Kops/s</div>
+        <div class="lbl">Throughput</div>
+      </div>
+      <div class="perf-card">
+        <div class="val">8B</div>
+        <div class="unit">per allocation</div>
+        <div class="lbl">Header overhead</div>
+      </div>
+      <div class="perf-card">
+        <div class="val">8</div>
+        <div class="unit">size classes</div>
+        <div class="lbl">Segregated lists</div>
+      </div>
+      <div class="perf-card">
+        <div class="val">16B</div>
+        <div class="unit">alignment</div>
+        <div class="lbl">Matches libc</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h3>Block Layout</h3>
+    <div class="block-diagram">
+      <div class="block-type">
+        <h5>Allocated Block</h5>
+        <div class="block-row header"><span class="field">HEADER</span><span class="size">8 bytes</span></div>
+        <div class="block-row payload"><span class="field">PAYLOAD</span><span class="size">n bytes</span></div>
+      </div>
+      <div class="block-type">
+        <h5>Free Block</h5>
+        <div class="block-row header"><span class="field">HEADER</span><span class="size">8 bytes</span></div>
+        <div class="block-row link"><span class="field">NEXT LINK</span><span class="size">8 bytes</span></div>
+        <div class="block-row link"><span class="field">PREV LINK</span><span class="size">8 bytes</span></div>
+        <div class="block-row payload"><span class="field">UNUSED</span><span class="size">n bytes</span></div>
+        <div class="block-row footer"><span class="field">FOOTER</span><span class="size">8 bytes</span></div>
+      </div>
+      <div class="block-type">
+        <h5>Small Free Block (16B)</h5>
+        <div class="block-row link"><span class="field">HEADER / PREV LINK</span><span class="size">8 bytes</span></div>
+        <div class="block-row link"><span class="field">FOOTER / NEXT LINK</span><span class="size">8 bytes</span></div>
+      </div>
+    </div>
+    <p style="margin-top:12px; font-size:0.82rem; color:#484f58;">Allocated blocks have no footer — the prev-allocated bit in each header records whether the preceding block is free, enabling coalescing without a footer round-trip.</p>
+  </section>
+
+  <section>
+    <h3>Key Design Decisions</h3>
+    <div class="features">
+      <div class="feature-card">
+        <div class="icon">📋</div>
+        <h4>Segregated Free Lists</h4>
+        <p>8 size classes starting at 16 bytes. malloc searches the appropriate class for best-fit, falling back to larger classes before calling sbrk.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔢</div>
+        <h4>Prev-Allocated Bit</h4>
+        <p>The second-lowest bit of every header records whether the preceding block is allocated — eliminating the need for a footer in allocated blocks.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">⚡</div>
+        <h4>Small Block Optimisation</h4>
+        <p>16-byte free blocks reuse header/footer fields as prev/next free-list pointers — no separate link fields needed, reducing minimum block size.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔗</div>
+        <h4>Immediate Coalescing</h4>
+        <p>Freed blocks are merged with adjacent free neighbours on every free() call using boundary tags and the prev-allocated bit.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h3>Header Structure</h3>
+    <div class="code-block">
+<pre><span class="comment">/* 64-bit header word layout */</span>
+<span class="comment">/* Bit 0  — BIT_ALLOCATED          (this block is in use)       */</span>
+<span class="comment">/* Bit 1  — BIT_PREVIOUS_ALLOCATED (preceding block is in use)  */</span>
+<span class="comment">/* Bit 2  — BIT_SMALL_FREE_BLOCK   (this is a 16-byte free block)*/</span>
+<span class="comment">/* Bits 3+ — block size (always a multiple of 16)               */</span>
+
+<span class="type">typedef</span> <span class="type">uint64_t</span> header_t;
+
+<span class="macro">#define</span> BIT_ALLOCATED          <span class="number">0x1</span>
+<span class="macro">#define</span> BIT_PREVIOUS_ALLOCATED <span class="number">0x2</span>
+<span class="macro">#define</span> BIT_SMALL_FREE_BLOCK   <span class="number">0x4</span>
+<span class="macro">#define</span> FLAG_MASK              <span class="number">7</span>
+<span class="macro">#define</span> SIZE_MASK              (~FLAG_MASK)
+<span class="macro">#define</span> NUM_FREE_LISTS         <span class="number">8</span>   <span class="comment">/* segregated size classes */</span>
+<span class="macro">#define</span> SMALL_FREE_BLOCK_SIZE  <span class="number">16</span>  <span class="comment">/* special-cased block type */</span></pre>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>Built by <a href="https://github.com/Halkhoori2000" target="_blank">Hamdan Alkhoori</a> &nbsp;·&nbsp; The Pennsylvania State University</p>
+</footer>
+
+</body>
+</html>
